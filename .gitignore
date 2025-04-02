@@ -1,0 +1,8 @@
+venv
+image_classifier_model.pth
+mlruns
+uploads
+data
+__pycache__/
+*.pyc
+*.log
