@@ -106,6 +106,11 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
+    # Delete the existing organized_images folder if it exists
+    if os.path.exists(ORGANIZED_FOLDER):
+        shutil.rmtree(ORGANIZED_FOLDER)
+    Path(ORGANIZED_FOLDER).mkdir(parents=True, exist_ok=True)
+    
     results = []  # To store the results for each file
 
     for file in files:
