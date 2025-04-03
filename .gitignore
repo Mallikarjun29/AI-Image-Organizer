@@ -3,6 +3,8 @@ image_classifier_model.pth
 mlruns
 uploads
 data
+organized_images
+organized_images.zip
 __pycache__/
 *.pyc
 *.log

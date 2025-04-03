@@ -4,10 +4,11 @@ and displaying its classification result.
 """
 
 import os
+import shutil
 from typing import Annotated
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request 
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -21,6 +22,10 @@ app = FastAPI()
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
+
+# Configure the folder for organized images
+ORGANIZED_FOLDER = "organized_images"
+Path(ORGANIZED_FOLDER).mkdir(parents=True, exist_ok=True)
 
 # Mount the uploads folder as a static files directory
 app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
@@ -93,37 +98,69 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload/")
-async def upload_file(request: Request, file: UploadFile = File(...)):
+async def upload_files(request: Request, files: list[UploadFile] = File(...)):
     """
-    Handles file uploads and displays the classification result.
+    Handles multiple file uploads, classifies them, organizes them into folders,
+    and creates a zip file for download.
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
-    if file and allowed_file(file.filename):
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        try:
-            with open(file_path, "wb") as f:
-                content = await file.read()
-                f.write(content)
-        except Exception:
-            raise HTTPException(status_code=500, detail="Error saving file")
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
 
-        # Load the model (you might want to load this only once at app startup)
-        from classifier_model import ImageClassifier
+    results = []  # To store the results for each file
 
-        classifier = ImageClassifier()
-        classifier.load_model()  # Load the saved model
+    for file in files:
+        if not file.filename:
+            continue  # Skip files with no name
+        if file and allowed_file(file.filename):
+            file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+            try:
+                with open(file_path, "wb") as f:
+                    content = await file.read()
+                    f.write(content)
+            except Exception:
+                raise HTTPException(status_code=500, detail=f"Error saving file: {file.filename}")
 
-        # Predict the image class
-        predicted_class = predict_image(file_path, classifier.model)
+            # Load the model (you might want to load this only once at app startup)
+            from classifier_model import ImageClassifier
 
-        return templates.TemplateResponse(
-            "result.html",
-            {
-                "request": request,
-                "image_path": file.filename,  # Pass only the file name
-                "predicted_class": predicted_class,
-            }
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+            classifier = ImageClassifier()
+            classifier.load_model()  # Load the saved model
+
+            # Predict the image class
+            predicted_class = predict_image(file_path, classifier.model)
+
+            # Create a folder for the predicted class if it doesn't exist
+            class_folder = os.path.join(ORGANIZED_FOLDER, predicted_class)
+            Path(class_folder).mkdir(parents=True, exist_ok=True)
+
+            # Move the file to the class folder
+            organized_file_path = os.path.join(class_folder, file.filename)
+            os.rename(file_path, organized_file_path)
+
+            # Append the result for this file
+            results.append({"filename": file.filename, "predicted_class": predicted_class})
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}")
+
+    # Create a zip file of the organized_images folder
+    zip_file_path = "organized_images.zip"
+    shutil.make_archive("organized_images", "zip", ORGANIZED_FOLDER)
+
+    return templates.TemplateResponse(
+        "result.html",
+        {
+            "request": request,
+            "results": results,  # Pass the list of results to the template
+            "zip_file_path": zip_file_path,  # Pass the zip file path to the template
+        }
+    )
+
+@app.get("/download-zip/")
+async def download_zip():
+    """
+    Endpoint to download the zip file of organized images.
+    """
+    zip_file_path = "organized_images.zip"
+    if not os.path.exists(zip_file_path):
+        raise HTTPException(status_code=404, detail="Zip file not found")
+    return FileResponse(zip_file_path, media_type="application/zip", filename="organized_images.zip")
