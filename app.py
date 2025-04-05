@@ -32,6 +32,13 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 
 templates = Jinja2Templates(directory="templates")
 
+
+# Load the model
+from classifier_model import ImageClassifier
+
+classifier = ImageClassifier()
+classifier.load_model()  # Load the saved model
+
 # Load the classes
 classes = (
     "plane",
@@ -110,7 +117,7 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
     if os.path.exists(ORGANIZED_FOLDER):
         shutil.rmtree(ORGANIZED_FOLDER)
     Path(ORGANIZED_FOLDER).mkdir(parents=True, exist_ok=True)
-    
+
     results = []  # To store the results for each file
 
     for file in files:
@@ -125,12 +132,6 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
             except Exception:
                 raise HTTPException(status_code=500, detail=f"Error saving file: {file.filename}")
 
-            # Load the model (you might want to load this only once at app startup)
-            from classifier_model import ImageClassifier
-
-            classifier = ImageClassifier()
-            classifier.load_model()  # Load the saved model
-
             # Predict the image class
             predicted_class = predict_image(file_path, classifier.model)
 
@@ -140,7 +141,7 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
 
             # Move the file to the class folder
             organized_file_path = os.path.join(class_folder, file.filename)
-            os.rename(file_path, organized_file_path)
+            shutil.copy2(file_path, organized_file_path)
 
             # Append the result for this file
             results.append({"filename": file.filename, "predicted_class": predicted_class})

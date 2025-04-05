@@ -1,0 +1,24 @@
+# Configuration for Drifted Data Simulation
+
+dataset:
+  root_path: './data' # Path where CIFAR-10 is stored/downloaded
+
+output:
+  base_image_dir: 'simulated_drift_images' # Base directory to save generated images
+
+# Define one or more drift scenarios
+drift_scenarios:
+  scenario_1: # Name used for sub-directory
+    total_samples: 100
+    target_distribution:
+      0: 0.50  # Airplane 50%
+      1: 0.05  # Automobile 5%
+      # Proportions for classes 2-9 will be calculated automatically to sum to 1
+  scenario_dense_dogs:
+    total_samples: 200 # Generate more samples for this scenario
+    target_distribution:
+      5: 0.70 # Dog 70%
+      3: 0.10 # Cat 10%
+      # Proportions for classes 0,1,2,4,6,7,8,9 calculated automatically
+
+# Add more scenarios as needed

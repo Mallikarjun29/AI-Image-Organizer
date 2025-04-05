@@ -8,3 +8,4 @@ organized_images.zip
 __pycache__/
 *.pyc
 *.log
+simulated_drift_images
