@@ -16,7 +16,18 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
+from prometheus_client import Counter, make_asgi_app # Gauge
+
 app = FastAPI()
+
+# --- Prometheus Metrics Definition ---
+# Define a counter for predicted classes.
+# 'predicted_class' will be a label to distinguish counts for each class.
+PREDICTIONS_TOTAL = Counter(
+    'image_predictions_total',
+    'Total number of images predicted by class',
+    ['predicted_class']
+)
 
 # Configure upload folder
 UPLOAD_FOLDER = "uploads"
@@ -30,29 +41,34 @@ Path(ORGANIZED_FOLDER).mkdir(parents=True, exist_ok=True)
 # Mount the uploads folder as a static files directory
 app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 
+# Mount the Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+# Configure Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
 
-# Load the model
-from classifier_model import ImageClassifier
-
-classifier = ImageClassifier()
-classifier.load_model()  # Load the saved model
+# --- Model Loading ---
+try:
+    from classifier_model import ImageClassifier
+    classifier = ImageClassifier()
+    classifier.load_model()  # Load the saved model
+    print("Image classifier model loaded successfully.")
+except ImportError:
+    print("Error: Could not import ImageClassifier from classifier_model.py")
+    classifier = None # Handle cases where model loading fails
+except Exception as e:
+    print(f"Error loading model: {e}")
+    classifier = None
 
 # Load the classes
 classes = (
-    "plane",
-    "car",
-    "bird",
-    "cat",
-    "deer",
-    "dog",
-    "frog",
-    "horse",
-    "ship",
-    "truck",
+    "plane", "car", "bird", "cat", "deer",
+    "dog", "frog", "horse", "ship", "truck",
 )
 
+# --- Helper Functions ---
 def allowed_file(filename: str) -> bool:
     """
     Checks if the uploaded file has an allowed extension.
@@ -110,6 +126,9 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
     Handles multiple file uploads, classifies them, organizes them into folders,
     and creates a zip file for download.
     """
+    if classifier is None:
+         raise HTTPException(status_code=500, detail="Model is not loaded, cannot process uploads.")
+
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -117,6 +136,10 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
     if os.path.exists(ORGANIZED_FOLDER):
         shutil.rmtree(ORGANIZED_FOLDER)
     Path(ORGANIZED_FOLDER).mkdir(parents=True, exist_ok=True)
+    zip_file_path = "organized_images.zip"
+    if os.path.exists(zip_file_path):
+         os.remove(zip_file_path)
+
 
     results = []  # To store the results for each file
 
@@ -134,12 +157,15 @@ async def upload_files(request: Request, files: list[UploadFile] = File(...)):
 
             # Predict the image class
             predicted_class = predict_image(file_path, classifier.model)
-
+            
+            # *** Increment Prometheus Counter ***
+            PREDICTIONS_TOTAL.labels(predicted_class=predicted_class).inc()
+            
             # Create a folder for the predicted class if it doesn't exist
             class_folder = os.path.join(ORGANIZED_FOLDER, predicted_class)
             Path(class_folder).mkdir(parents=True, exist_ok=True)
 
-            # Move the file to the class folder
+            # COpy the file to the class folder
             organized_file_path = os.path.join(class_folder, file.filename)
             shutil.copy2(file_path, organized_file_path)
 
