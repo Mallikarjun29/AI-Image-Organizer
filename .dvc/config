@@ -1,0 +1,4 @@
+[core]
+    remote = uploads
+['remote "uploads"']
+    url = ../uploads

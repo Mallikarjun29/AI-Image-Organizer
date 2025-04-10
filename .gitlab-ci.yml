@@ -1,0 +1,58 @@
+image: python:3.9
+
+variables:
+  DVC_REMOTE_URL: ${DVC_REMOTE_URL}
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+
+cache:
+  paths:
+    - .pip-cache/
+    - .dvc/cache
+
+stages:
+  - setup
+  - retrain
+  - evaluate
+  - deploy
+
+setup:
+  stage: setup
+  script:
+    - pip install -r requirements.txt
+    - dvc pull
+
+retrain:
+  stage: retrain
+  script:
+    - python ml_pipeline/retrain_pipeline.py
+    - dvc repro
+    - dvc push
+  artifacts:
+    paths:
+      - models/
+      - metrics.json
+    reports:
+      metrics: metrics.json
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /trigger-retrain/
+    - when: manual
+
+evaluate:
+  stage: evaluate
+  script:
+    - python ml_pipeline/evaluate.py
+  dependencies:
+    - retrain
+  artifacts:
+    reports:
+      metrics: evaluation.json
+
+deploy:
+  stage: deploy
+  script:
+    - python ml_pipeline/deploy.py
+  dependencies:
+    - evaluate
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  environment: production

@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./organized_images:/app/organized_images
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./ml_pipeline:/app/ml_pipeline
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_DB=image_organizer
+      - MONGO_COLLECTION=image_metadata
+      - PROMETHEUS_PORT=8001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  drift_detector:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    volumes:
+      - ./uploads:/app/uploads
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./ml_pipeline:/app/ml_pipeline
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_DB=image_organizer
+      - MONGO_COLLECTION=image_metadata
+      - PROMETHEUS_PORT=8001
+      - MIN_NEW_SAMPLES=200
+      - RETRAIN_COOLDOWN_MINUTES=60
+      - MIN_DRIFT_SAMPLES=500
+      - DRIFT_THRESHOLD=0.75
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  dvc_pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    volumes:
+      - ./uploads:/app/uploads:ro
+      - ./organized_images:/app/organized_images
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./ml_pipeline:/app/ml_pipeline
+      - ./.dvc:/app/.dvc
+      - ./.git:/app/.git  # If using git for DVC
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+    user: root  # Add this line to ensure proper permissions
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app_network
+    # Keep container running for interactive use
+    command: tail -f /dev/null
+
+volumes:
+  mongodb_data:
+
+networks:
+  app_network:
+    driver: bridge

@@ -1,0 +1,36 @@
+stages:
+  prepare:
+    cmd: python ml_pipeline/prepare.py
+    deps:
+      - ml_pipeline/prepare.py
+      - uploads
+    outs:
+      - data/retraining/images
+      - data/retraining/dataset_info.json
+  
+  train:
+    cmd: python ml_pipeline/train.py
+    deps:
+      - ml_pipeline/train.py
+      - data/retraining/dataset_info.json
+      - data/retraining/images
+    params:
+      - hyperparameters.yaml:
+          - learning_rate
+          - batch_size
+          - epochs
+          - model_architecture
+    outs:
+      - models/
+    metrics:
+      - metrics.json:
+          cache: false
+
+  evaluate:
+    cmd: python ml_pipeline/evaluate.py
+    deps:
+      - ml_pipeline/evaluate.py
+      - models/
+    metrics:
+      - evaluation.json:
+          cache: false

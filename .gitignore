@@ -1,11 +1,59 @@
-venv
-image_classifier_model.pth
-mlruns
-uploads
-data
-organized_images
-organized_images.zip
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+
+# Docker
+.env
+.docker/
+
+# Data and Models
+uploads/*
+!uploads/.gitkeep
+organized_images/*
+!organized_images/.gitkeep
+models/*
+!models/.gitkeep
+data/retraining/images/*
+!data/retraining/images/.gitkeep
+mlruns
+data
+data_drift_simulation/data
+data_drift_simulation/simulated_drift_images
+
+# MongoDB
+mongodb_data/
+
+# DVC
+/data
+.dvc/cache
+.dvc/tmp
+.dvc/plots
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
 *.log
-simulated_drift_images

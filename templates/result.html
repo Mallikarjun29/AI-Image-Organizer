@@ -2,9 +2,34 @@
 <html>
 <head>
     <title>Image Classification Results</title>
+    <style>
+        .correct { color: green; }
+        .incorrect { color: red; }
+        .result-item {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        img {
+            max-width: 300px;
+            height: auto;
+        }
+    </style>
 </head>
 <body>
     <h1>Image Classification Results</h1>
+    <ul>
+        {% for result in results %}
+        <li class="result-item">
+            <img src="/uploads/{{ result.random_name }}" alt="Uploaded Image">
+            <p>Original Filename: {{ result.filename }}</p>
+            <p>Actual Class: {{ result.actual_class if result.actual_class else "Unknown" }}</p>
+            <p class="{{ 'correct' if result.actual_class == result.predicted_class else 'incorrect' }}">
+                Predicted Class: {{ result.predicted_class }}
+            </p>
+        </li>
+        {% endfor %}
+    </ul>
     <a href="/download-zip/" download>Download Organized Images as Zip</a>
     <br>
     <a href="/">Upload More Images</a>

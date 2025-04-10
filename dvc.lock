@@ -1,0 +1,73 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python ml_pipeline/prepare.py
+    deps:
+    - path: ml_pipeline/prepare.py
+      hash: md5
+      md5: e3ac7ef67f4598162b388d2de1989685
+      size: 3942
+    - path: uploads
+      hash: md5
+      md5: f08f7728dd1e3e333b0c299134ce5d6e.dir
+      size: 45472099
+      nfiles: 290
+    outs:
+    - path: data/retraining/dataset_info.json
+      hash: md5
+      md5: 3cc01c097bf315c7e170bbc1710b666e
+      size: 6597
+    - path: data/retraining/images
+      hash: md5
+      md5: 83dcf4b2b7d89bd7012849691959fadc.dir
+      size: 145103
+      nfiles: 62
+  train:
+    cmd: python ml_pipeline/train.py
+    deps:
+    - path: data/retraining/dataset_info.json
+      hash: md5
+      md5: 3cc01c097bf315c7e170bbc1710b666e
+      size: 6597
+    - path: data/retraining/images
+      hash: md5
+      md5: 83dcf4b2b7d89bd7012849691959fadc.dir
+      size: 145103
+      nfiles: 62
+    - path: ml_pipeline/train.py
+      hash: md5
+      md5: 7cdd34c56f1daa4e18efba76f421b999
+      size: 4574
+    params:
+      hyperparameters.yaml:
+        batch_size: 32
+        epochs: 1
+        learning_rate: 0.001
+        model_architecture: resnet18
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: ec8e9793cc3ad39b0dd0f583c008e1fa
+      size: 201
+    - path: models/
+      hash: md5
+      md5: 5bdd710ecd79694be76ac02d506ae89b.dir
+      size: 89607544
+      nfiles: 2
+  evaluate:
+    cmd: python ml_pipeline/evaluate.py
+    deps:
+    - path: ml_pipeline/evaluate.py
+      hash: md5
+      md5: 6c712185154d652543813aa8a7418473
+      size: 1482
+    - path: models/
+      hash: md5
+      md5: 5bdd710ecd79694be76ac02d506ae89b.dir
+      size: 89607544
+      nfiles: 2
+    outs:
+    - path: evaluation.json
+      hash: md5
+      md5: afacf6c979aa56f2210648705df8fd0b
+      size: 43
