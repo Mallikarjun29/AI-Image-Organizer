@@ -14,14 +14,18 @@ stages:
       - ml_pipeline/train.py
       - data/retraining/dataset_info.json
       - data/retraining/images
+      - hyperparameters.yaml
     params:
       - hyperparameters.yaml:
+          - model_version
           - learning_rate
           - batch_size
           - epochs
           - model_architecture
     outs:
-      - models/
+      - models/model_v1.pth:
+          persist: true
+          cache: false
     metrics:
       - metrics.json:
           cache: false
@@ -30,7 +34,8 @@ stages:
     cmd: python ml_pipeline/evaluate.py
     deps:
       - ml_pipeline/evaluate.py
-      - models/
+      - models/model_v1.pth
+      - hyperparameters.yaml
     metrics:
       - evaluation.json:
           cache: false

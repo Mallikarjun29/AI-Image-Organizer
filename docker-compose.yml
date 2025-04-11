@@ -72,8 +72,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ml
+    ports:
+      - "8001:8001"  # Expose drift detection metrics port
     volumes:
       - ./uploads:/app/uploads
+      - ./organized_images:/app/organized_images
       - ./models:/app/models
       - ./data:/app/data
       - ./ml_pipeline:/app/ml_pipeline
@@ -86,6 +89,9 @@ services:
       - RETRAIN_COOLDOWN_MINUTES=60
       - MIN_DRIFT_SAMPLES=500
       - DRIFT_THRESHOLD=0.75
+      - SCRAPE_INTERVAL_SECONDS=60
+      - TIME_WINDOW_MINUTES=60
+    command: python drift_detect.py
     depends_on:
       mongodb:
         condition: service_healthy
@@ -100,7 +106,7 @@ services:
       context: .
       dockerfile: Dockerfile.ml
     volumes:
-      - ./uploads:/app/uploads:ro
+      - ./uploads:/app/uploads
       - ./organized_images:/app/organized_images
       - ./models:/app/models
       - ./data:/app/data
@@ -109,7 +115,6 @@ services:
       - ./.git:/app/.git  # If using git for DVC
     environment:
       - MONGO_URI=mongodb://mongodb:27017/
-    user: root  # Add this line to ensure proper permissions
     depends_on:
       mongodb:
         condition: service_healthy
